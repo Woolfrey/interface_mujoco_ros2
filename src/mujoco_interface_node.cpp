@@ -91,12 +91,12 @@ private:
     // Set up the camera parameters
     cam_.lookat[0] = 0.0; // X coordinate of the lookat point
     cam_.lookat[1] = 0.0; // Y coordinate of the lookat point
-    cam_.lookat[2] = 0.75; // Z coordinate of the lookat point
+    cam_.lookat[2] = 0.5; // Z coordinate of the lookat point
 
-    cam_.distance = 2.0;  // Distance from the lookat point
+    cam_.distance = 2.5;  // Distance from the lookat point
 
-    cam_.azimuth = 45.0;  // Azimuth angle in degrees
-    cam_.elevation = -30.0; // Elevation angle in degrees (higher value for a higher view)
+    cam_.azimuth = 140.0;  // Azimuth angle in degrees
+    cam_.elevation = -20.0; // Elevation angle in degrees (higher value for a higher view)
 
     cam_.orthographic = 0; // 0 for perspective, 1 for orthographic
 }
