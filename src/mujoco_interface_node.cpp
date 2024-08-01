@@ -1,19 +1,51 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <mujoco/mujoco.h>
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>
-
 class MujocoInterfaceNode : public rclcpp::Node
 {
 public:
     MujocoInterfaceNode(const std::string &filePath) : Node("mujoco_interface_node")
     {
+        // Initialize GLFW
+        if (!glfwInit())
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to initialize GLFW");
+            rclcpp::shutdown();
+            return;
+        }
+
+        // Create a GLFW window
+        window_ = glfwCreateWindow(1200, 900, "MuJoCo Visualization", NULL, NULL);
+        if (!window_)
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to create GLFW window");
+            glfwTerminate();
+            rclcpp::shutdown();
+            return;
+        }
+
+        // Make the OpenGL context current
+        glfwMakeContextCurrent(window_);
+        glfwSwapInterval(1);
+
+        // Load the MuJoCo model and create the rendering context
         if (!loadModel(filePath))
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to load MuJoCo model");
             rclcpp::shutdown();
         }
+        
+        // Initialize visualization data structures
+        mjv_defaultCamera(&cam_);
+        mjv_defaultOption(&opt_);
+        mjv_defaultPerturb(&pert_);
+        mjr_defaultContext(&con_);
+        mjv_makeScene(mjModel_, &scn_, 1000);
+        mjr_makeContext(mjModel_, &con_, mjFONTSCALE_100);
+
         joint_state_publisher_ = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(10),
@@ -24,6 +56,10 @@ public:
     {
         mj_deleteData(mjData_);
         mj_deleteModel(mjModel_);
+        mjv_freeScene(&scn_);
+        mjr_freeContext(&con_);
+        glfwDestroyWindow(window_);
+        glfwTerminate();
     }
 
 private:
@@ -42,16 +78,25 @@ private:
 
     void update()
     {
+        if (!mjModel_ || !mjData_)
+        {
+            RCLCPP_ERROR(this->get_logger(), "MuJoCo model or data is not initialized.");
+            return;
+        }
+
+        // Step the simulation
         mj_step(mjModel_, mjData_);
+
+        // Publish joint states
         auto msg = sensor_msgs::msg::JointState();
         msg.header.stamp = this->now();
         msg.name.resize(mjModel_->nq);
         msg.position.resize(mjModel_->nq);
-        msg.velocity.resize(mjModel_->nq);
+        msg.velocity.resize(mjModel_->nv);
 
         for (int i = 0; i < mjModel_->nq; ++i)
         {
-            msg.name[i] = mj_id2name(mjModel_, mjOBJ_JOINT, i); // Get joint name
+            msg.name[i] = mj_id2name(mjModel_, mjOBJ_JOINT, i);
             msg.position[i] = mjData_->qpos[i];
         }
         for (int i = 0; i < mjModel_->nv; ++i)
@@ -59,13 +104,39 @@ private:
             msg.velocity[i] = mjData_->qvel[i];
         }
         joint_state_publisher_->publish(msg);
+
+        // Ensure the OpenGL context is current
+        glfwMakeContextCurrent(window_);
+
+        // Update scene and render
+        mjv_updateScene(mjModel_, mjData_, &opt_, NULL, &cam_, mjCAT_ALL, &scn_);
+
+        // Get framebuffer size
+        int width, height;
+        glfwGetFramebufferSize(window_, &width, &height);
+        mjrRect viewport = {0, 0, width, height};
+
+        // Render scene
+        mjr_render(viewport, &scn_, &con_);
+        
+        // Swap buffers and process events
+        glfwSwapBuffers(window_);
+        glfwPollEvents();
     }
 
     mjModel *mjModel_;
     mjData *mjData_;
+    mjvCamera cam_;
+    mjvOption opt_;
+    mjvPerturb pert_;
+    mjvScene scn_;
+    mjrContext con_;
+    GLFWwindow *window_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_publisher_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
+
+
 
 int main(int argc, char *argv[])
 {

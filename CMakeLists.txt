@@ -10,6 +10,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(PkgConfig REQUIRED)
+find_package(glfw3 REQUIRED)  # Find GLFW package
 
 # MuJoCo
 set(MUJOCO_PATH "/opt/mujoco/mujoco-3.2.0")  # Update this path to your MuJoCo installation
@@ -20,7 +22,8 @@ link_directories(${MUJOCO_PATH}/lib)
 add_executable(mujoco_interface_node src/mujoco_interface_node.cpp)
 ament_target_dependencies(mujoco_interface_node rclcpp sensor_msgs)
 
-target_link_libraries(mujoco_interface_node mujoco)
+# Link against MuJoCo and GLFW libraries
+target_link_libraries(mujoco_interface_node mujoco glfw)
 
 install(TARGETS
   mujoco_interface_node
