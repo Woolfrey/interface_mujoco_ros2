@@ -3,7 +3,7 @@
 #include <mujoco/mujoco.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include <vector>
+
 class MujocoInterfaceNode : public rclcpp::Node
 {
 public:
@@ -29,21 +29,28 @@ public:
 
         // Make the OpenGL context current
         glfwMakeContextCurrent(window_);
-        glfwSwapInterval(1);
+        glfwSwapInterval(1); // Set swap interval for vsync
 
         // Load the MuJoCo model and create the rendering context
         if (!loadModel(filePath))
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to load MuJoCo model");
             rclcpp::shutdown();
+            return;
         }
-        
-        // Initialize visualization data structures
+
+        // Initialize MuJoCo rendering context
         mjv_defaultCamera(&cam_);
         mjv_defaultOption(&opt_);
         mjv_defaultPerturb(&pert_);
         mjr_defaultContext(&con_);
         mjv_makeScene(mjModel_, &scn_, 1000);
+
+        // Set up the camera view
+        setupCamera();
+
+        // Create MuJoCo rendering context
+        glfwMakeContextCurrent(window_);
         mjr_makeContext(mjModel_, &con_, mjFONTSCALE_100);
 
         joint_state_publisher_ = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
@@ -75,6 +82,24 @@ private:
         mjData_ = mj_makeData(mjModel_);
         return true;
     }
+
+    void setupCamera()
+    {
+    // Initialize the camera with default values
+    mjv_defaultCamera(&cam_);
+
+    // Set up the camera parameters
+    cam_.lookat[0] = 0.0; // X coordinate of the lookat point
+    cam_.lookat[1] = 0.0; // Y coordinate of the lookat point
+    cam_.lookat[2] = 0.75; // Z coordinate of the lookat point
+
+    cam_.distance = 2.0;  // Distance from the lookat point
+
+    cam_.azimuth = 45.0;  // Azimuth angle in degrees
+    cam_.elevation = -30.0; // Elevation angle in degrees (higher value for a higher view)
+
+    cam_.orthographic = 0; // 0 for perspective, 1 for orthographic
+}
 
     void update()
     {
@@ -110,7 +135,7 @@ private:
 
         // Update scene and render
         mjv_updateScene(mjModel_, mjData_, &opt_, NULL, &cam_, mjCAT_ALL, &scn_);
-
+        
         // Get framebuffer size
         int width, height;
         glfwGetFramebufferSize(window_, &width, &height);
@@ -135,8 +160,6 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_publisher_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
-
-
 
 int main(int argc, char *argv[])
 {
