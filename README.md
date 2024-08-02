@@ -8,6 +8,9 @@ This class establishes communication between a MuJoCo simulation and ROS2.
 > It is currently only publishing joint states. Work to receive joint commands is underway. <br>
 > Stay tuned!
 
+>[!TIP]
+> You can download MuJoCo robot models [here](https://github.com/google-deepmind/mujoco_menagerie.git).
+
 - [Features](#features)
 - [Dependencies](#dependencies)
 - [Installation](#installation)
