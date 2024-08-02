@@ -1,3 +1,4 @@
+<a name="top"></a>
 # MuJoCo-ROS2 Interface
 
 This class establishes communication between a MuJoCo simulation and ROS2.
@@ -5,7 +6,17 @@ This class establishes communication between a MuJoCo simulation and ROS2.
 > [!WARNING]
 > This repository is still under construction. <br>
 > It is currently only publishing joint states. Work to receive joint commands is underway. <br>
-> Stay tuned! 
+> Stay tuned!
+
+- [Features](#features)
+- [Dependencies](#dependencies)
+- [Installation](#installation)
+   - [Prerequisites](#prerequisites)
+   - [Building the Project](#building-the-project)
+   - [Usage](#usage)
+   - [Launching the Interface](#launching-the-interface)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
@@ -15,12 +26,16 @@ This class establishes communication between a MuJoCo simulation and ROS2.
 - Provides real-time visualization of the robot and its environment.
 - Allows manual interaction with the simulation.
 
+[⬆️ Back to top.](#top)
+
 ## Dependencies
 
 - ROS2 (Humble Hawksbill or later)
 - MuJoCo
 - GLFW
 - Standard C++ libraries
+
+[⬆️ Back to top.](#top)
 
 ## Installation
 
@@ -39,6 +54,8 @@ Ensure that you have ROS2 and MuJoCo installed on your system.
    sudo apt-get install libglfw3-dev
 ```
 
+[⬆️ Back to top.](#top)
+
 ### Building the Project
 
 Clone the repository:
@@ -55,6 +72,8 @@ Source the ROS2 workspace:
 source install/setup.bash
 ```
 
+[⬆️ Back to top.](#top)
+
 ### Usage
 
 #### Launching the Interface
@@ -67,6 +86,8 @@ ros2 run mujoco_interface mujoco_interface_node /path/to/your/robot_model.xml
 
 Replace /path/to/your/robot_model.xml with the path to your MuJoCo XML model or scene file.
 
+[⬆️ Back to top.](#top)
+
 ## Contributing
 
 Contributions are welcome! Please fork the repository and submit pull requests.
@@ -77,6 +98,8 @@ Contributions are welcome! Please fork the repository and submit pull requests.
 4. Push to the Branch (git push origin feature/AmazingFeature)
 5. Open a Pull Request
 
+[⬆️ Back to top.](#top)
+
 ## License
 
 Distributed under the GNU General Public License. See LICENSE for more information.
@@ -84,4 +107,4 @@ Contact
 
 Jon Woolfrey - jonathan.woolfrey@gmail.com
 
-Project Link: https://github.com/yourusername/MuJoCo-ROS2-Interface
+[⬆️ Back to top.](#top)
