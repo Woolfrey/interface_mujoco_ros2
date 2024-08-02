@@ -2,6 +2,11 @@
 
 This class establishes communication between a MuJoCo simulation and ROS2.
 
+> [!WARNING]
+> This repository is still under construction. <br>
+> It is currently only publishing joint states. Work to receive joint commands is underway. <br>
+> Stay tuned! 
+
 ## Features
 
 - Launches a MuJoCo simulation.
