@@ -1,15 +1,25 @@
-<package format="2">
-  <name>mujoco_ros2_interface</name>
-  <version>0.0.0</version>
-  <description>MuJoCo interface node for ROS2</description>
-  <maintainer email="you@example.com">Your Name</maintainer>
-  <license>Apache-2.0</license>
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
-  <build_depend>rclcpp</build_depend>
-  <build_depend>sensor_msgs</build_depend>
+   <!-- Package information: -->
+   <name>mujoco_interface</name>
+   <version>0.0.0</version>
+   <description>Provides ROS2 communication with MuJoCo simulation.</description>
+   <maintainer email="jonathan.woolfrey@gmail.com">Woolfrey</maintainer>
+   <license>GNU General Public Licence GPLv3</license>
 
-  <exec_depend>rclcpp</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
+   <!-- Basic requirements to build: -->
+   
+   <buildtool_depend>ament_cmake</buildtool_depend>
+
+   <test_depend>ament_lint_auto</test_depend>
+   <test_depend>ament_lint_common</test_depend>
+   
+   <export>
+     <build_type>ament_cmake</build_type>
+   </export>
+   
+   <depend>sensor_msgs</depend>
+   
 </package>
-
