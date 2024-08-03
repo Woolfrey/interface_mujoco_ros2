@@ -37,7 +37,7 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
     // Load the MuJoCo model and create the rendering context
     char error[1000] = "Could not load binary model";
     _model = mj_loadXML(filePath.c_str(), nullptr, error, 1000);                                    // Load the model
-    if (!_model)
+    if (not _model)
     {
         RCLCPP_ERROR(this->get_logger(), "Error loading model: %s", error);
         rclcpp::shutdown();                                                                         // Shut down this node
@@ -49,6 +49,8 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
     _jointStateMessage.name.resize(_model->nq);
     _jointStateMessage.position.resize(_model->nq);
     _jointStateMessage.velocity.resize(_model->nq);
+    
+    _errorIntegral.resize(_model->nq);
     
     // Record names
     for(int i = 0; i < _model->nq; i++)
@@ -71,14 +73,19 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
     glfwMakeContextCurrent(_window);
     mjr_makeContext(_model, &_context, mjFONTSCALE_100);
 
-    _jointStatePublisher = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
-
+    _jointStatePublisher = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 1);
+    
+     _jointCommandSubscriber = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+        "joint_commands",
+        1,
+        std::bind(&MuJoCoInterface::joint_command_callback, this, std::placeholders::_1));
 
     // Create timers
-    _simTimer = this->create_wall_timer(std::chrono::milliseconds(10),
+    
+    _simTimer = this->create_wall_timer(std::chrono::milliseconds(1000/_simFrequency),
                                         std::bind(&MuJoCoInterface::update_simulation, this));
 
-    _visTimer = this->create_wall_timer(std::chrono::milliseconds(40),
+    _visTimer = this->create_wall_timer(std::chrono::milliseconds(1000/_vizFrequency),
                                         std::bind(&MuJoCoInterface::update_visualization, this));
 }
 
@@ -158,4 +165,40 @@ MuJoCoInterface::update_visualization()
     // Swap buffers and process events
     glfwSwapBuffers(_window);
     glfwPollEvents();
+}
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                    Handle joint commands                                       //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void
+MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+{
+    if (msg->data.size() != _model->nq + 1)                                                         // Expecting one more element for mode
+    {
+        RCLCPP_WARN(this->get_logger(), "Received joint command with incorrect size");
+        return;
+    }
+    
+    // Determine torque input based on control modes
+    if(msg->data[0] == 0)                                                                           // Direct torque control
+    {
+        for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = msg->data[i+1];                  // Apply torque command directly
+    }
+    else if(msg->data[0] == 1)                                                                      // Velocity control
+    {
+        for(int i = 0; i < _model->nq; i++)
+        {
+            double error = msg->data[i+1] - _jointState->qvel[i];                                   // Current velocity error
+            
+            _errorIntegral[i] += (error /= (double)_simFrequency);                                  // Accumulate error
+            
+            _jointState->ctrl[i] = _proportionalGain * error + _integralGain * _errorIntegral[i];   // Apply PI control                             
+        }
+    }
+    else                                                                                            // Error
+    {
+        RCLCPP_ERROR(this->get_logger(), "Unknown control mode.");
+        
+        for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;
+    }
 }
