@@ -48,7 +48,7 @@ class MuJoCoInterface : public rclcpp::Node
 
         rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr _jointStatePublisher;            ///< As it says on the label
 
-        rclcpp::TimerBase::SharedPtr _timer;                                                        ///< Regulates the ROS2 node
+        rclcpp::TimerBase::SharedPtr _simTimer, _visTimer;                                          ///< Regulates the ROS2 node
 
         sensor_msgs::msg::JointState _jointStateMessage;                                            ///< For publishing joint state data over ROS2
         
@@ -68,10 +68,16 @@ class MuJoCoInterface : public rclcpp::Node
                               const bool   &orthographic = false);
 
         /**
-         * Updates the robot state, publishes joint state information, and updates 3D model.
+         * Updates the robot state, publishes joint state information.
          */
         void
-        update();
+        update_simulation();
+        
+        /**
+         * Updates the visualisation.
+         */
+        void
+        update_visualization();
 };
 
 #endif

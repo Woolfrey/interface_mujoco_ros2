@@ -72,9 +72,14 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
     mjr_makeContext(_model, &_context, mjFONTSCALE_100);
 
     _jointStatePublisher = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
-    _timer = this->create_wall_timer(
-        std::chrono::milliseconds(10),
-        std::bind(&MuJoCoInterface::update, this));
+
+
+    // Create timers
+    _simTimer = this->create_wall_timer(std::chrono::milliseconds(10),
+                                        std::bind(&MuJoCoInterface::update_simulation, this));
+
+    _visTimer = this->create_wall_timer(std::chrono::milliseconds(40),
+                                        std::bind(&MuJoCoInterface::update_visualization, this));
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,7 +118,7 @@ MuJoCoInterface::set_camera_properties(const std::array<double,3> &focalPoint,
  //                                    Update the simulation                                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void
-MuJoCoInterface::update()
+MuJoCoInterface::update_simulation()
 {
     if((not _model) and (not _jointState))
     {
@@ -131,7 +136,14 @@ MuJoCoInterface::update()
     }
     
     _jointStatePublisher->publish(_jointStateMessage);                                              // As it says
-    
+}
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                                    Update the 3D simulation                                    //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void
+MuJoCoInterface::update_visualization()
+{
     // Update 3D rendering
     glfwMakeContextCurrent(_window);                                                                // Ensure the OpenGL context is current
     mjv_updateScene(_model, _jointState, &_renderingOptions, NULL, &_camera, mjCAT_ALL, &_scene);   // Update scene and render
