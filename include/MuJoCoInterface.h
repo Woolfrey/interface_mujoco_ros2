@@ -8,11 +8,12 @@
 #ifndef MUJOCOINTERFACE_H
 #define MUJOCOINTERFACE_H
 
-#include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries.
-#include <sensor_msgs/msg/joint_state.hpp>                                                          // For publishing / subscribing to joint states.
-#include <mujoco/mujoco.h>                                                                          // Dynamic simulation library
 #include <GLFW/glfw3.h>                                                                             // Graphics Library Framework; for visualisation
 #include <iostream>                                                                                 // std::cerr, std::cout
+#include <mujoco/mujoco.h>                                                                          // Dynamic simulation library
+#include <rclcpp/rclcpp.hpp>                                                                        // ROS2 C++ libraries.
+#include <sensor_msgs/msg/joint_state.hpp>                                                          // For publishing / subscribing to joint states.
+#include <std_msgs/msg/float64_multi_array.hpp>
 
 /**
  * This class launches both a MuJoCo simulation, and ROS2 node for communication.
@@ -48,9 +49,20 @@ class MuJoCoInterface : public rclcpp::Node
 
         rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr _jointStatePublisher;            ///< As it says on the label
 
+        rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr _jointCommandSubscriber;  ///< Subscriber for joint commands
+        
         rclcpp::TimerBase::SharedPtr _simTimer, _visTimer;                                          ///< Regulates the ROS2 node
 
         sensor_msgs::msg::JointState _jointStateMessage;                                            ///< For publishing joint state data over ROS2
+        
+        unsigned int _simFrequency = 500;
+        unsigned int _vizFrequency = 10;
+        
+        double _proportionalGain = 10;
+        double _integralGain = 1.0;
+        
+        std::vector<double> _errorIntegral;
+                 
         
         /**
          * Sets the viewing properties in the window.
@@ -78,6 +90,13 @@ class MuJoCoInterface : public rclcpp::Node
          */
         void
         update_visualization();
+        
+        /**
+         * Callback function to handle incoming joint commands.
+         * @param msg The message containing joint commands.
+         */
+        void
+        joint_command_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg);
 };
 
 #endif
