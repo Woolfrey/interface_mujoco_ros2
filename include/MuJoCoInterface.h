@@ -35,6 +35,8 @@ class MuJoCoInterface : public rclcpp::Node
 
     private:
     
+        enum ControlMode {POSITION, VELOCITY, TORQUE, UNKNOWN} _controlMode;
+        
         mjModel *_model;                                                                            ///< Underlying model of the robot.
         mjData  *_jointState;                                                                       ///< Joint state data (position, velocity, acceleration)
 
@@ -56,13 +58,17 @@ class MuJoCoInterface : public rclcpp::Node
         sensor_msgs::msg::JointState _jointStateMessage;                                            ///< For publishing joint state data over ROS2
         
         unsigned int _simFrequency = 500;
-        unsigned int _vizFrequency = 10;
+        unsigned int _vizFrequency = 20;
         
         double _proportionalGain = 10;
-        double _integralGain = 1.0;
+        double _derivativeGain   = 1.0;
+        double _integralGain     = 1.0;
         
+        std::vector<double> _controlReference;
+        std::vector<double> _error;
+        std::vector<double> _errorDerivative;
         std::vector<double> _errorIntegral;
-                 
+                
         
         /**
          * Sets the viewing properties in the window.

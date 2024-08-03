@@ -32,7 +32,7 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
 
     // Make the OpenGL context current
     glfwMakeContextCurrent(_window);
-    glfwSwapInterval(1); // Set swap interval for vsync
+    glfwSwapInterval(1);                                                                            // Set swap interval for vsync
 
     // Load the MuJoCo model and create the rendering context
     char error[1000] = "Could not load binary model";
@@ -49,7 +49,11 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
     _jointStateMessage.name.resize(_model->nq);
     _jointStateMessage.position.resize(_model->nq);
     _jointStateMessage.velocity.resize(_model->nq);
+    _jointStateMessage.effort.resize(_model->nq);
     
+    _controlReference.resize(_model->nq);
+    _error.resize(_model->nq);
+    _errorDerivative.resize(_model->nq);
     _errorIntegral.resize(_model->nq);
     
     // Record names
@@ -82,10 +86,10 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
 
     // Create timers
     
-    _simTimer = this->create_wall_timer(std::chrono::milliseconds(1000/_simFrequency),
+    _simTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_simFrequency)),
                                         std::bind(&MuJoCoInterface::update_simulation, this));
 
-    _visTimer = this->create_wall_timer(std::chrono::milliseconds(1000/_vizFrequency),
+    _visTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_vizFrequency)),
                                         std::bind(&MuJoCoInterface::update_visualization, this));
 }
 
@@ -132,6 +136,43 @@ MuJoCoInterface::update_simulation()
         RCLCPP_ERROR(this->get_logger(), "MuJoCo model or data is not initialized.");
         return;
     }
+    
+    // Compute control input based on mode
+    switch(_controlMode)
+    {
+        case POSITION:
+        {
+            // NOT YET PROGRAMMED.
+            // Need to implement PID.
+            
+            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;
+            break;
+        }
+        case VELOCITY:
+        {
+            for(int i = 0; i < _model->nq; i++)
+            {
+                _error[i] = _controlReference[i] - _jointState->qvel[i];                            // Velocity error
+                
+                _errorIntegral[i] += _error[i]/(double)_simFrequency;                               // Add up errors
+                
+                _jointState->ctrl[i] = _proportionalGain*_error[i]
+                                     + _integralGain*_errorIntegral[i];                             // Apply PI control
+            }
+            
+            break;
+        }
+        case TORQUE:
+        {
+            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = _controlReference[i];
+            
+            break;
+        }
+        default:
+        {
+            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;
+        }
+    }
 
     mj_step(_model, _jointState);                                                                   // Take a step in the simulation
 
@@ -140,6 +181,7 @@ MuJoCoInterface::update_simulation()
     {
         _jointStateMessage.position[i] = _jointState->qpos[i];
         _jointStateMessage.velocity[i] = _jointState->qvel[i];
+        _jointStateMessage.effort[i]   = _jointState->actuator_force[i];
     }
     
     _jointStatePublisher->publish(_jointStateMessage);                                              // As it says
@@ -179,26 +221,19 @@ MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::
         return;
     }
     
-    // Determine torque input based on control modes
-    if(msg->data[0] == 0)                                                                           // Direct torque control
-    {
-        for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = msg->data[i+1];                  // Apply torque command directly
-    }
-    else if(msg->data[0] == 1)                                                                      // Velocity control
-    {
-        for(int i = 0; i < _model->nq; i++)
-        {
-            double error = msg->data[i+1] - _jointState->qvel[i];                                   // Current velocity error
-            
-            _errorIntegral[i] += (error /= (double)_simFrequency);                                  // Accumulate error
-            
-            _jointState->ctrl[i] = _proportionalGain * error + _integralGain * _errorIntegral[i];   // Apply PI control                             
-        }
-    }
-    else                                                                                            // Error
+    // Set control mode based on first digit
+     if(msg->data[0] == 0)
+     {
+        _controlMode = POSITION;
+        RCLCPP_ERROR(this->get_logger(), "Position control not yet programmed!");
+     }
+    else if(msg->data[0] == 1) _controlMode = VELOCITY;
+    else if(msg->data[0] == 2) _controlMode = TORQUE;
+    else
     {
         RCLCPP_ERROR(this->get_logger(), "Unknown control mode.");
-        
-        for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;
+        _controlMode = UNKNOWN;
     }
+    
+    for(int i = 0; i < _model->nq; i++) _controlReference[i] = msg->data[i+1];                      // Save reference 
 }
