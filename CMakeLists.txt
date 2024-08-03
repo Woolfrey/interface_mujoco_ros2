@@ -7,10 +7,11 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 # Find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(glfw3 REQUIRED)
+find_package(ament_cmake REQUIRED)                                                                  # So ROS2 can compile?
+find_package(glfw3 REQUIRED)                                                                        # Graphics Library FrameWork
+find_package(rclcpp REQUIRED)                                                                       # ROS2 C++ libraries
+find_package(sensor_msgs REQUIRED)                                                                  # sensor_msgs::msg::JointState
+find_package(std_msgs REQUIRED)                                                                     # std_msgs::msg::Float64MultiArray
 
 # MuJoCo
 set(MUJOCO_PATH "/opt/mujoco/mujoco-3.2.0")                                                         # Update this path to your MuJoCo installation
@@ -24,7 +25,7 @@ add_executable(mujoco_interface_node src/mujoco_interface_node.cpp
     
 target_link_libraries(mujoco_interface_node mujoco glfw)
                                      
-ament_target_dependencies(mujoco_interface_node rclcpp sensor_msgs)
+ament_target_dependencies(mujoco_interface_node rclcpp sensor_msgs std_msgs)
 
 install(TARGETS mujoco_interface_node
         DESTINATION lib/${PROJECT_NAME})
