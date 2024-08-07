@@ -26,7 +26,7 @@ class MuJoCoInterface : public rclcpp::Node
          * Contructor.
          * @param filePath Location of an .xml file specifying a robot model and/or scene.
          */
-        MuJoCoInterface(const std::string &filePath);
+        MuJoCoInterface();
         
        /**
         * Deconstructor.
@@ -35,7 +35,7 @@ class MuJoCoInterface : public rclcpp::Node
 
     private:
     
-        enum ControlMode {POSITION, VELOCITY, TORQUE, UNKNOWN} _controlMode;
+        enum ControlMode {POSITION, VELOCITY, TORQUE, UNKNOWN} _controlMode;                        ///< As it says
         
         mjModel *_model;                                                                            ///< Underlying model of the robot.
         mjData  *_jointState;                                                                       ///< Joint state data (position, velocity, acceleration)
@@ -68,8 +68,13 @@ class MuJoCoInterface : public rclcpp::Node
         std::vector<double> _error;
         std::vector<double> _errorDerivative;
         std::vector<double> _errorIntegral;
-                
         
+        bool _cameraOrthographic = false;
+        double _cameraAzimuth    = 45.0;
+        double _cameraDistance   = 2.5;
+        double _cameraElevation  = -30;           
+        std::vector<double> _cameraFocalPoint = {0.0, 0.0, 1.0};
+       
         /**
          * Sets the viewing properties in the window.
          * @param focalPoint Defines the x, y, z coordinate for the focus of the camera.

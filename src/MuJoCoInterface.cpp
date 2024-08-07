@@ -10,8 +10,76 @@
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                         Constructor                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_interface_node")
+MuJoCoInterface::MuJoCoInterface() : Node("mujoco_interface_node")
 {
+    // Load the robot model
+    std::string xmlLocation = "";
+
+    this->declare_parameter<std::string>("xml_location", xmlLocation);
+
+    this->get_parameter("xml_location", xmlLocation);
+
+    if (xmlLocation.empty())
+    {
+        std::string message = "No XML file located in given path '" + xmlLocation + "'. "
+                              "Did you set the parameter correctly in the launch file?";
+      
+        RCLCPP_ERROR(this->get_logger(), message.c_str());
+      
+        rclcpp::shutdown();
+    }
+    
+    char blah[1000] = "Could not load binary model";
+    _model = mj_loadXML(xmlLocation.c_str(), nullptr, blah, 1000);                                  // Load the model
+    
+    if (not _model)
+    {
+        RCLCPP_ERROR(this->get_logger(), "Error loading model: %s", blah);
+        rclcpp::shutdown();                                                                         // Shut down this node
+    }
+    
+    _jointState = mj_makeData(_model);                                                              // Link joint state to this model
+    
+    // Resize arrays based on number of joints in model
+    _jointStateMessage.name.resize(_model->nq);
+    _jointStateMessage.position.resize(_model->nq);
+    _jointStateMessage.velocity.resize(_model->nq);
+    _jointStateMessage.effort.resize(_model->nq);
+    _controlReference.resize(_model->nq);
+    _error.resize(_model->nq);
+    _errorDerivative.resize(_model->nq);
+    _errorIntegral.resize(_model->nq);
+    
+    // Record joint names
+    for(int i = 0; i < _model->nq; i++)
+    {
+        _jointStateMessage.name[i] = mj_id2name(_model, mjOBJ_JOINT, i);
+    }
+    
+    // Load control gains
+    this->get_parameter("proportional_gain", _proportionalGain);
+    this->get_parameter("derivative_gain",   _derivativeGain);
+    this->get_parameter("integral_gain",    _integralGain);
+    
+    // Create joint state publisher, joint command subscriber
+     std::string publisher_name = "joint_states";
+    this->get_parameter("publisher_name", publisher_name);
+    _jointStatePublisher = this->create_publisher<sensor_msgs::msg::JointState>(publisher_name, 1);
+
+    std::string subscriber_name = "joint_controls";
+    this->get_parameter("subscriber_name", subscriber_name);
+    _jointCommandSubscriber =this->create_subscription<std_msgs::msg::Float64MultiArray>(subscriber_name, 1, std::bind(&MuJoCoInterface::joint_command_callback, this, std::placeholders::_1)); 
+
+    // Create simulation timer
+    this->get_parameter("simulation_frequency", _simFrequency);
+    
+    _simTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_simFrequency)),
+                                        std::bind(&MuJoCoInterface::update_simulation, this));
+    
+    this->get_parameter("visualization_frequency", _vizFrequency);
+    _visTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_vizFrequency)),
+                                        std::bind(&MuJoCoInterface::update_visualization, this));    
+
     // Initialise Graphics Library FrameWork (GLFW)
     if (not glfwInit())
     {
@@ -34,34 +102,6 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
     glfwMakeContextCurrent(_window);
     glfwSwapInterval(1);                                                                            // Set swap interval for vsync
 
-    // Load the MuJoCo model and create the rendering context
-    char error[1000] = "Could not load binary model";
-    _model = mj_loadXML(filePath.c_str(), nullptr, error, 1000);                                    // Load the model
-    if (not _model)
-    {
-        RCLCPP_ERROR(this->get_logger(), "Error loading model: %s", error);
-        rclcpp::shutdown();                                                                         // Shut down this node
-    }
-    
-    _jointState = mj_makeData(_model);                                                              // Link joint state to this model
-    
-    // Resize the arrays in the message data
-    _jointStateMessage.name.resize(_model->nq);
-    _jointStateMessage.position.resize(_model->nq);
-    _jointStateMessage.velocity.resize(_model->nq);
-    _jointStateMessage.effort.resize(_model->nq);
-    
-    _controlReference.resize(_model->nq);
-    _error.resize(_model->nq);
-    _errorDerivative.resize(_model->nq);
-    _errorIntegral.resize(_model->nq);
-    
-    // Record names
-    for(int i = 0; i < _model->nq; i++)
-    {
-        _jointStateMessage.name[i] = mj_id2name(_model, mjOBJ_JOINT, i);
-    }
-
     // Initialize MuJoCo rendering context
     mjv_defaultCamera(&_camera);
     mjv_defaultOption(&_renderingOptions);
@@ -69,28 +109,22 @@ MuJoCoInterface::MuJoCoInterface(const std::string &filePath) : Node("mujoco_int
     mjr_defaultContext(&_context);
     mjv_makeScene(_model, &_scene, 1000);
 
-    // Set up the camera view
-    mjv_defaultCamera(&_camera);
-    set_camera_properties({0.0, 0.0, 0.5}, 2.0, 140.0, -45.0, false);
-
     // Create MuJoCo rendering context
     glfwMakeContextCurrent(_window);
     mjr_makeContext(_model, &_context, mjFONTSCALE_100);
 
-    _jointStatePublisher = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 1);
-    
-     _jointCommandSubscriber = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-        "joint_commands",
-        1,
-        std::bind(&MuJoCoInterface::joint_command_callback, this, std::placeholders::_1));
+    // Get and set camera properties
+    this->get_parameter("camera_focal_point", _cameraFocalPoint);
+    this->get_parameter("camera_distance", _cameraDistance);
+    this->get_parameter("camera_azimuth", _cameraAzimuth);
+    this->get_parameter("camera_elevation", _cameraElevation);
+    this->get_parameter("camera_orthographic", _cameraOrthographic);
 
-    // Create timers
-    
-    _simTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_simFrequency)),
-                                        std::bind(&MuJoCoInterface::update_simulation, this));
-
-    _visTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_vizFrequency)),
-                                        std::bind(&MuJoCoInterface::update_visualization, this));
+    set_camera_properties({_cameraFocalPoint[0], _cameraFocalPoint[1], _cameraFocalPoint[2]},
+                          _cameraDistance,
+                          _cameraAzimuth,
+                          _cameraElevation,
+                          _cameraOrthographic);
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,12 +143,11 @@ MuJoCoInterface::~MuJoCoInterface()
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                          Sets camera viewing position & angle                                  //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-MuJoCoInterface::set_camera_properties(const std::array<double,3> &focalPoint,
-                                       const double &distance,
-                                       const double &azimuth,
-                                       const double &elevation,
-                                       const bool &orthographic)
+void MuJoCoInterface::set_camera_properties(const std::array<double, 3> &focalPoint,
+                                            const double &distance,
+                                            const double &azimuth,
+                                            const double &elevation,
+                                            const bool &orthographic)
 {
     _camera.lookat[0]    = focalPoint[0];
     _camera.lookat[1]    = focalPoint[1];
@@ -122,7 +155,7 @@ MuJoCoInterface::set_camera_properties(const std::array<double,3> &focalPoint,
     _camera.distance     = distance; 
     _camera.azimuth      = azimuth;    
     _camera.elevation    = elevation;
-    _camera.orthographic = orthographic;      
+    _camera.orthographic = orthographic;
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -190,19 +223,19 @@ MuJoCoInterface::update_simulation()
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                    Update the 3D simulation                                    //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-MuJoCoInterface::update_visualization()
+void MuJoCoInterface::update_visualization()
 {
-    // Update 3D rendering
-    glfwMakeContextCurrent(_window);                                                                // Ensure the OpenGL context is current
-    mjv_updateScene(_model, _jointState, &_renderingOptions, NULL, &_camera, mjCAT_ALL, &_scene);   // Update scene and render
+    glfwMakeContextCurrent(_window); // Ensure OpenGL context is current
     
+    // Update 3D rendering
+    mjv_updateScene(_model, _jointState, &_renderingOptions, NULL, &_camera, mjCAT_ALL, &_scene);
+
     // Get framebuffer size
     int width, height;
     glfwGetFramebufferSize(_window, &width, &height);
     mjrRect viewport = {0, 0, width, height};
 
-    mjr_render(viewport, &_scene, &_context);                                                       // Render scene
+    mjr_render(viewport, &_scene, &_context); // Render scene
     
     // Swap buffers and process events
     glfwSwapBuffers(_window);
