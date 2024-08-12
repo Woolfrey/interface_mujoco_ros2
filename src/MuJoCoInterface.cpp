@@ -49,10 +49,7 @@ MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
     // Create joint state publisher and joint command subscriber
     _jointStatePublisher = this->create_publisher<sensor_msgs::msg::JointState>(jointStateTopicName, 1);
     
-    _jointCommandSubscriber
-    = this->create_subscription<std_msgs::msg::Float64MultiArray>(jointControlTopicName, 1,
-                                                                  std::bind(&MuJoCoInterface::joint_command_callback,
-                                                                  this, std::placeholders::_1));
+    _jointCommandSubscriber = this->create_subscription<std_msgs::msg::Float64MultiArray>(jointControlTopicName, 1,  std::bind(&MuJoCoInterface::joint_command_callback, this, std::placeholders::_1));
 
     // Initialize Graphics Library FrameWork (GLFW)
     if (!glfwInit())
