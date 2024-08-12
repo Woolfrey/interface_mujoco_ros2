@@ -92,9 +92,9 @@ class MuJoCoInterface : public rclcpp::Node
         unsigned int _simFrequency = 500;
         unsigned int _vizFrequency = 20;
         
-        double _proportionalGain = 10;
-        double _derivativeGain   = 1.0;
-        double _integralGain     = 1.0;
+        double _proportionalGain = 1.0;
+        double _derivativeGain   = 0.0;
+        double _integralGain     = 0.0;
         
         std::vector<double> _controlReference;
         std::vector<double> _error;

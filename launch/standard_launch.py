@@ -6,12 +6,12 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     return LaunchDescription([
         # Declare Launch Arguments
-        DeclareLaunchArgument('control_mode', default_value='TORQUE'),
+        DeclareLaunchArgument('control_mode', default_value='VELOCITY'),
         DeclareLaunchArgument('xml_location', default_value='/home/woolfrey/workspace/mujoco_menagerie/kuka_iiwa_14/scene.xml'),
         DeclareLaunchArgument('publisher_name', default_value='joint_states'),
         DeclareLaunchArgument('subscriber_name', default_value='joint_commands'),
-        DeclareLaunchArgument('proportional_gain', default_value='10.0'),
-        DeclareLaunchArgument('derivative_gain', default_value='10000.0'),
+        DeclareLaunchArgument('proportional_gain', default_value='0.1'),
+        DeclareLaunchArgument('derivative_gain', default_value='0.0'),
         DeclareLaunchArgument('integral_gain', default_value='1.0'),
         DeclareLaunchArgument('camera_focal_point', default_value='[0.0, 0.0, 0.5]'),
         DeclareLaunchArgument('camera_distance', default_value='2.5'),

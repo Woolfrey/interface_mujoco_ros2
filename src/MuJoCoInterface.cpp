@@ -34,10 +34,11 @@ MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
     _jointStateMessage.position.resize(_model->nq);
     _jointStateMessage.velocity.resize(_model->nq);
     _jointStateMessage.effort.resize(_model->nq);
-    _controlReference.resize(_model->nq, 0.0);
     _error.resize(_model->nq);
     _errorDerivative.resize(_model->nq);
     _errorIntegral.resize(_model->nq);
+    
+    _controlReference.resize(_model->nq, 0.0);
 
     // Record joint names
     for (int i = 0; i < _model->nq; i++)
@@ -140,7 +141,7 @@ MuJoCoInterface::set_camera_properties(const std::array<double, 3> &focalPoint,
                                        const double &distance,
                                        const double &azimuth,
                                        const double &elevation,
-                                       const bool &orthographic)
+                                       const bool   &orthographic)
 {
     _camera.lookat[0]    = focalPoint[0];
     _camera.lookat[1]    = focalPoint[1];
@@ -168,29 +169,34 @@ MuJoCoInterface::update_simulation()
     {
         case POSITION:
         {
-            // NOT YET PROGRAMMED.
-            // Need to implement PID.
-            
-            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;
+            for(int i = 0; i < _model->nq; i++)
+            {     
+                double error = _controlReference[i] - _jointState->qpos[i];                         // Position error
+                
+                _errorIntegral[i] += error / (double)_simFrequency;                                 // Cumulative error
+                
+                double errorDerivative = (error - _error[i]) * _simFrequency;                       // Change in error over time
+                
+                     _jointState->ctrl[i] = _proportionalGain * error
+                                         + _integralGain * _errorIntegral[i]
+                                         + _derivativeGain * errorDerivative;                       // Apply PID control
+                    
+                    _error[i] = error;                                                              // Update error for next iteration           
+            }  
             
             break;
         }
         case VELOCITY:
         {
-    for(int i = 0; i < _model->nq; i++)
-    { 
-        double error = _controlReference[i] - _jointState->qvel[i];        // Velocity error
-        
-        _errorIntegral[i] += error / (double)_simFrequency;               // Integrate errors
-
-        double errorDerivative = (error - _error[i]) * _simFrequency;     // Derivative of error
-        
-        _jointState->ctrl[i] = _proportionalGain * error
-                             + _integralGain * _errorIntegral[i]
-                             + _derivativeGain * errorDerivative;         // Apply PID control
-        
-        _error[i] = error;                                                // Update error for next iteration
-    }
+            for(int i = 0; i < _model->nq; i++)
+            {
+                _error[i] = _controlReference[i] - _jointState->qvel[i];                            // Velocity error
+                 
+                _errorIntegral[i] += _error[i] / (double)_simFrequency;                             // Accumulated error (i.e. position error)
+                
+                _jointState->ctrl[i] = _proportionalGain * _error[i]
+                                     + _integralGain * _errorIntegral[i];                           // Apply PI control
+            }
             
             break;
         }
@@ -252,6 +258,6 @@ MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::
         RCLCPP_WARN(this->get_logger(), "Received joint command with incorrect size.");
         return;
     }
-
+    
     for(int i = 0; i < _model->nq; i++) _controlReference[i] = msg->data[i];                        // Save reference 
 }
