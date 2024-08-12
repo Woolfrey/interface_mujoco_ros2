@@ -1,4 +1,4 @@
-/**
+/*
  * @file   MuJoCoInterface.cpp
  * @author Jon Woolfrey
  * @data   August 2024
@@ -10,86 +10,59 @@
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                         Constructor                                            //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-MuJoCoInterface::MuJoCoInterface() : Node("mujoco_interface_node")
+MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
+                                 const std::string &jointStateTopicName,
+                                 const std::string &jointControlTopicName,
+                                 ControlMode controlMode)
+                                 : Node("mujoco_interface_node"),
+                                   _controlMode(controlMode)
 {
     // Load the robot model
-    std::string xmlLocation = "";
+    char error[1000] = "Could not load binary model";
+    _model = mj_loadXML(xmlLocation.c_str(), nullptr, error, 1000);
 
-    this->declare_parameter<std::string>("xml_location", xmlLocation);
-
-    this->get_parameter("xml_location", xmlLocation);
-
-    if (xmlLocation.empty())
+    if (!_model)
     {
-        std::string message = "No XML file located in given path '" + xmlLocation + "'. "
-                              "Did you set the parameter correctly in the launch file?";
-      
-        RCLCPP_ERROR(this->get_logger(), message.c_str());
-      
+        RCLCPP_ERROR(this->get_logger(), "Error loading model: %s", error);
         rclcpp::shutdown();
     }
-    
-    char blah[1000] = "Could not load binary model";
-    _model = mj_loadXML(xmlLocation.c_str(), nullptr, blah, 1000);                                  // Load the model
-    
-    if (not _model)
-    {
-        RCLCPP_ERROR(this->get_logger(), "Error loading model: %s", blah);
-        rclcpp::shutdown();                                                                         // Shut down this node
-    }
-    
-    _jointState = mj_makeData(_model);                                                              // Link joint state to this model
-    
-    // Resize arrays based on number of joints in model
+
+    _jointState = mj_makeData(_model);  // Initialize joint state
+
+    // Resize arrays based on the number of joints in the model
     _jointStateMessage.name.resize(_model->nq);
     _jointStateMessage.position.resize(_model->nq);
     _jointStateMessage.velocity.resize(_model->nq);
     _jointStateMessage.effort.resize(_model->nq);
-    _controlReference.resize(_model->nq);
+    _controlReference.resize(_model->nq, 0.0);
     _error.resize(_model->nq);
     _errorDerivative.resize(_model->nq);
     _errorIntegral.resize(_model->nq);
-    
+
     // Record joint names
-    for(int i = 0; i < _model->nq; i++)
+    for (int i = 0; i < _model->nq; i++)
     {
         _jointStateMessage.name[i] = mj_id2name(_model, mjOBJ_JOINT, i);
     }
-    
-    // Load control gains
-    this->get_parameter("proportional_gain", _proportionalGain);
-    this->get_parameter("derivative_gain",   _derivativeGain);
-    this->get_parameter("integral_gain",    _integralGain);
-    
-    // Create joint state publisher, joint command subscriber
-     std::string publisher_name = "joint_states";
-    this->get_parameter("publisher_name", publisher_name);
-    _jointStatePublisher = this->create_publisher<sensor_msgs::msg::JointState>(publisher_name, 1);
 
-    std::string subscriber_name = "joint_controls";
-    this->get_parameter("subscriber_name", subscriber_name);
-    _jointCommandSubscriber =this->create_subscription<std_msgs::msg::Float64MultiArray>(subscriber_name, 1, std::bind(&MuJoCoInterface::joint_command_callback, this, std::placeholders::_1)); 
-
-    // Create simulation timer
-    this->get_parameter("simulation_frequency", _simFrequency);
+    // Create joint state publisher and joint command subscriber
+    _jointStatePublisher = this->create_publisher<sensor_msgs::msg::JointState>(jointStateTopicName, 1);
     
-    _simTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_simFrequency)),
-                                        std::bind(&MuJoCoInterface::update_simulation, this));
-    
-    this->get_parameter("visualization_frequency", _vizFrequency);
-    _visTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_vizFrequency)),
-                                        std::bind(&MuJoCoInterface::update_visualization, this));    
+    _jointCommandSubscriber
+    = this->create_subscription<std_msgs::msg::Float64MultiArray>(jointControlTopicName, 1,
+                                                                  std::bind(&MuJoCoInterface::joint_command_callback,
+                                                                  this, std::placeholders::_1));
 
-    // Initialise Graphics Library FrameWork (GLFW)
-    if (not glfwInit())
+    // Initialize Graphics Library FrameWork (GLFW)
+    if (!glfwInit())
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to initialize Graphics Library FrameWork (GLFW).");
-        rclcpp::shutdown();                                                                     
+        rclcpp::shutdown();
         return;
     }
 
     // Create a GLFW window
-    _window = glfwCreateWindow(1200, 900, "MuJoCo Visualization", NULL, NULL);
+    _window = glfwCreateWindow(1200, 900, "MuJoCo Visualization", nullptr, nullptr);
     if (!_window)
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to create GLFW window");
@@ -100,7 +73,7 @@ MuJoCoInterface::MuJoCoInterface() : Node("mujoco_interface_node")
 
     // Make the OpenGL context current
     glfwMakeContextCurrent(_window);
-    glfwSwapInterval(1);                                                                            // Set swap interval for vsync
+    glfwSwapInterval(1);  // Set swap interval for vsync
 
     // Initialize MuJoCo rendering context
     mjv_defaultCamera(&_camera);
@@ -112,19 +85,14 @@ MuJoCoInterface::MuJoCoInterface() : Node("mujoco_interface_node")
     // Create MuJoCo rendering context
     glfwMakeContextCurrent(_window);
     mjr_makeContext(_model, &_context, mjFONTSCALE_100);
+    
+    // Create timers
+    
+    _simTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_simFrequency)),
+                                        std::bind(&MuJoCoInterface::update_simulation, this));
 
-    // Get and set camera properties
-    this->get_parameter("camera_focal_point", _cameraFocalPoint);
-    this->get_parameter("camera_distance", _cameraDistance);
-    this->get_parameter("camera_azimuth", _cameraAzimuth);
-    this->get_parameter("camera_elevation", _cameraElevation);
-    this->get_parameter("camera_orthographic", _cameraOrthographic);
-
-    set_camera_properties({_cameraFocalPoint[0], _cameraFocalPoint[1], _cameraFocalPoint[2]},
-                          _cameraDistance,
-                          _cameraAzimuth,
-                          _cameraElevation,
-                          _cameraOrthographic);
+    _visTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_vizFrequency)),
+                                        std::bind(&MuJoCoInterface::update_visualization, this));
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,13 +109,38 @@ MuJoCoInterface::~MuJoCoInterface()
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
+ //                               Set the gains for feedback control                               //
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool
+MuJoCoInterface::set_feedback_gains(const double &proportional,
+                                    const double &integral,
+                                    const double &derivative)
+{
+    if(proportional < 0 or integral < 0 or derivative < 0)
+    {
+        RCLCPP_WARN(this->get_logger(), "Gains cannot be negative.");
+        
+        return false;
+    }
+    else
+    {
+        _proportionalGain = proportional;
+        _derivativeGain   = derivative;
+        _integralGain     = integral;
+        
+        return true;
+    }
+}          
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                          Sets camera viewing position & angle                                  //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void MuJoCoInterface::set_camera_properties(const std::array<double, 3> &focalPoint,
-                                            const double &distance,
-                                            const double &azimuth,
-                                            const double &elevation,
-                                            const bool &orthographic)
+void
+MuJoCoInterface::set_camera_properties(const std::array<double, 3> &focalPoint,
+                                       const double &distance,
+                                       const double &azimuth,
+                                       const double &elevation,
+                                       const bool &orthographic)
 {
     _camera.lookat[0]    = focalPoint[0];
     _camera.lookat[1]    = focalPoint[1];
@@ -179,19 +172,25 @@ MuJoCoInterface::update_simulation()
             // Need to implement PID.
             
             for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;
+            
             break;
         }
         case VELOCITY:
         {
-            for(int i = 0; i < _model->nq; i++)
-            {
-                _error[i] = _controlReference[i] - _jointState->qvel[i];                            // Velocity error
-                
-                _errorIntegral[i] += _error[i]/(double)_simFrequency;                               // Add up errors
-                
-                _jointState->ctrl[i] = _proportionalGain*_error[i]
-                                     + _integralGain*_errorIntegral[i];                             // Apply PI control
-            }
+    for(int i = 0; i < _model->nq; i++)
+    { 
+        double error = _controlReference[i] - _jointState->qvel[i];        // Velocity error
+        
+        _errorIntegral[i] += error / (double)_simFrequency;               // Integrate errors
+
+        double errorDerivative = (error - _error[i]) * _simFrequency;     // Derivative of error
+        
+        _jointState->ctrl[i] = _proportionalGain * error
+                             + _integralGain * _errorIntegral[i]
+                             + _derivativeGain * errorDerivative;         // Apply PID control
+        
+        _error[i] = error;                                                // Update error for next iteration
+    }
             
             break;
         }
@@ -248,25 +247,11 @@ void MuJoCoInterface::update_visualization()
 void
 MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
 {
-    if (msg->data.size() != _model->nq + 1)                                                         // Expecting one more element for mode
+    if (msg->data.size() != _model->nq)                                                             // Expecting one more element for mode
     {
-        RCLCPP_WARN(this->get_logger(), "Received joint command with incorrect size");
+        RCLCPP_WARN(this->get_logger(), "Received joint command with incorrect size.");
         return;
     }
-    
-    // Set control mode based on first digit
-     if(msg->data[0] == 0)
-     {
-        _controlMode = POSITION;
-        RCLCPP_ERROR(this->get_logger(), "Position control not yet programmed!");
-     }
-    else if(msg->data[0] == 1) _controlMode = VELOCITY;
-    else if(msg->data[0] == 2) _controlMode = TORQUE;
-    else
-    {
-        RCLCPP_ERROR(this->get_logger(), "Unknown control mode.");
-        _controlMode = UNKNOWN;
-    }
-    
-    for(int i = 0; i < _model->nq; i++) _controlReference[i] = msg->data[i+1];                      // Save reference 
+
+    for(int i = 0; i < _model->nq; i++) _controlReference[i] = msg->data[i];                        // Save reference 
 }

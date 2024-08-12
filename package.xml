@@ -2,14 +2,11 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
 
-   <!-- Package information: -->
    <name>mujoco_interface</name>
    <version>0.0.0</version>
    <description>Provides ROS2 communication with MuJoCo simulation.</description>
    <maintainer email="jonathan.woolfrey@gmail.com">Woolfrey</maintainer>
    <license>GNU General Public Licence GPLv3</license>
-
-   <!-- Basic requirements to build: -->
    
    <buildtool_depend>ament_cmake</buildtool_depend>
 

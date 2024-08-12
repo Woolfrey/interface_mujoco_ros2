@@ -1,27 +1,47 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
     return LaunchDescription([
+        # Declare Launch Arguments
+        DeclareLaunchArgument('control_mode', default_value='TORQUE'),
+        DeclareLaunchArgument('xml_location', default_value='/home/woolfrey/workspace/mujoco_menagerie/kuka_iiwa_14/scene.xml'),
+        DeclareLaunchArgument('publisher_name', default_value='joint_states'),
+        DeclareLaunchArgument('subscriber_name', default_value='joint_commands'),
+        DeclareLaunchArgument('proportional_gain', default_value='10.0'),
+        DeclareLaunchArgument('derivative_gain', default_value='10000.0'),
+        DeclareLaunchArgument('integral_gain', default_value='1.0'),
+        DeclareLaunchArgument('camera_focal_point', default_value='[0.0, 0.0, 0.5]'),
+        DeclareLaunchArgument('camera_distance', default_value='2.5'),
+        DeclareLaunchArgument('camera_azimuth', default_value='45.0'),
+        DeclareLaunchArgument('camera_elevation', default_value='-30.0'),
+        DeclareLaunchArgument('camera_orthographic', default_value='true'),
+        DeclareLaunchArgument('simulation_frequency', default_value='500'),
+        DeclareLaunchArgument('visualization_frequency', default_value='20'),
+
+        # MuJoCo Interface Node
         Node(
             package='mujoco_interface',
             executable='mujoco_interface_node',
-            name='mujoco_interface_node',
             output='screen',
-            parameters=[
-                {'xml_location': '/home/woolfrey/workspace/mujoco_menagerie/kuka_iiwa_14/scene.xml'},
-                {'publisher_name': 'joint_states'},
-                {'subscriber_name': 'joint_commands'},
-                {'proportional_gain': 20.0},
-                {'derivative_gain': 2.0},
-                {'integral_gain': 5.0},
-                {'camera_focal_point': [0.0, 0.0, 0.5]},
-                {'camera_distance': 2.5},
-                {'camera_azimuth': 45.0},
-                {'camera_elevation': -30.0},
-                {'camera_orthographic': True},
-                {'simulation_frequency' : 500},
-                {'visualization_frequency' : 20}
-            ]
+            parameters=[{
+                'control_mode': LaunchConfiguration('control_mode'),
+                'xml_location': LaunchConfiguration('xml_location'),
+                'publisher_name': LaunchConfiguration('publisher_name'),
+                'subscriber_name': LaunchConfiguration('subscriber_name'),
+                'proportional_gain': LaunchConfiguration('proportional_gain'),
+                'derivative_gain': LaunchConfiguration('derivative_gain'),
+                'integral_gain': LaunchConfiguration('integral_gain'),
+                'camera_focal_point': LaunchConfiguration('camera_focal_point'),
+                'camera_distance': LaunchConfiguration('camera_distance'),
+                'camera_azimuth': LaunchConfiguration('camera_azimuth'),
+                'camera_elevation': LaunchConfiguration('camera_elevation'),
+                'camera_orthographic': LaunchConfiguration('camera_orthographic'),
+                'simulation_frequency': LaunchConfiguration('simulation_frequency'),
+                'visualization_frequency': LaunchConfiguration('visualization_frequency')
+            }]
         )
     ])
+

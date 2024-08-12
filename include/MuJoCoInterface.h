@@ -15,27 +15,59 @@
 #include <sensor_msgs/msg/joint_state.hpp>                                                          // For publishing / subscribing to joint states.
 #include <std_msgs/msg/float64_multi_array.hpp>
 
+enum ControlMode {POSITION, VELOCITY, TORQUE, UNKNOWN};                                             // This needs a global scope
+        
 /**
  * This class launches both a MuJoCo simulation, and ROS2 node for communication.
  */
 class MuJoCoInterface : public rclcpp::Node
 {
     public:
-    
+            
         /**
          * Contructor.
          * @param filePath Location of an .xml file specifying a robot model and/or scene.
          */
-        MuJoCoInterface();
+        MuJoCoInterface(const std::string &xmlLocation,
+                        const std::string &jointStateTopicName,
+                        const std::string &jointControlTopicName,
+                        ControlMode controlMode = TORQUE);
         
        /**
         * Deconstructor.
         */
         ~MuJoCoInterface();
-
+        
+        /**
+         * Set the gains for feedback control.
+         * @param proportional The gain in position error.
+         * @param integral The gain on the accumulated position error.
+         * @param derivative The gain in the change in position error.
+         * @return False if there is a problem with the input arguments.
+         */
+        bool
+        set_feedback_gains(const double &proportional,
+                           const double &integral,
+                           const double &derivative);
+                           
+        
+        /**
+         * Sets the viewing properties in the window.
+         * @param focalPoint Defines the x, y, z coordinate for the focus of the camera.
+         * @param distance The distance from said focal point to the camera.
+         * @param azimuth The angle of rotation around the focal point.
+         * @param elevation The angle of the line of sight relative to the ground plane.
+         * @param orthographic Type of projection. True for orthographics, false for perspective.
+         */
+        void
+        set_camera_properties(const std::array<double,3> &focalPoint,
+                              const double &distance = 2.0,
+                              const double &azimuth = 140.0,
+                              const double &elevation = -45.0,
+                              const bool   &orthographic = false);
     private:
-    
-        enum ControlMode {POSITION, VELOCITY, TORQUE, UNKNOWN} _controlMode;                        ///< As it says
+     
+        ControlMode _controlMode;
         
         mjModel *_model;                                                                            ///< Underlying model of the robot.
         mjData  *_jointState;                                                                       ///< Joint state data (position, velocity, acceleration)
@@ -74,22 +106,7 @@ class MuJoCoInterface : public rclcpp::Node
         double _cameraDistance   = 2.5;
         double _cameraElevation  = -30;           
         std::vector<double> _cameraFocalPoint = {0.0, 0.0, 1.0};
-       
-        /**
-         * Sets the viewing properties in the window.
-         * @param focalPoint Defines the x, y, z coordinate for the focus of the camera.
-         * @param distance The distance from said focal point to the camera.
-         * @param azimuth The angle of rotation around the focal point.
-         * @param elevation The angle of the line of sight relative to the ground plane.
-         * @param orthographic Type of projection. True for orthographics, false for perspective.
-         */
-        void
-        set_camera_properties(const std::array<double,3> &focalPoint,
-                              const double &distance = 2.0,
-                              const double &azimuth = 140.0,
-                              const double &elevation = -45.0,
-                              const bool   &orthographic = false);
-
+      
         /**
          * Updates the robot state, publishes joint state information.
          */
