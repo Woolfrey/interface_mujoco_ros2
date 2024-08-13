@@ -13,9 +13,12 @@
 MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
                                  const std::string &jointStateTopicName,
                                  const std::string &jointControlTopicName,
-                                 ControlMode controlMode)
+                                 ControlMode controlMode,
+                                 int simulationFrequency,
+                                 int visualizationFrequency)
                                  : Node("mujoco_interface_node"),
-                                   _controlMode(controlMode)
+                                   _controlMode(controlMode),
+                                   _simFrequency(simulationFrequency)
 {
     // Load the robot model
     char error[1000] = "Could not load binary model";
@@ -38,7 +41,7 @@ MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
     _errorDerivative.resize(_model->nq);
     _errorIntegral.resize(_model->nq);
     
-    _controlReference.resize(_model->nq, 0.0);
+    _referencePosition.resize(_model->nq, 0.0);
 
     // Record joint names
     for (int i = 0; i < _model->nq; i++)
@@ -86,10 +89,10 @@ MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
     
     // Create timers
     
-    _simTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_simFrequency)),
+    _simTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/simulationFrequency)),
                                         std::bind(&MuJoCoInterface::update_simulation, this));
 
-    _visTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/_vizFrequency)),
+    _visTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/visualizationFrequency)),
                                         std::bind(&MuJoCoInterface::update_visualization, this));
 }
 
@@ -165,50 +168,41 @@ MuJoCoInterface::update_simulation()
     switch(_controlMode)
     {
         case POSITION:
-        {
-            for(int i = 0; i < _model->nq; i++)
-            {     
-                double error = _controlReference[i] - _jointState->qpos[i];                         // Position error
-                
-                _errorIntegral[i] += error / (double)_simFrequency;                                 // Cumulative error
-                
-                double errorDerivative = (error - _error[i]) * _simFrequency;                       // Change in error over time
-                
-                     _jointState->ctrl[i] = _proportionalGain * error
-                                         + _integralGain * _errorIntegral[i]
-                                         + _derivativeGain * errorDerivative;                       // Apply PID control
-                    
-                    _error[i] = error;                                                              // Update error for next iteration           
-            }  
-            
-            break;
-        }
         case VELOCITY:
         {
             for(int i = 0; i < _model->nq; i++)
-            {
-                _error[i] = _controlReference[i] - _jointState->qvel[i];                            // Velocity error
-                 
-                _errorIntegral[i] += _error[i] / (double)_simFrequency;                             // Accumulated error (i.e. position error)
-                
-                _jointState->ctrl[i] = _proportionalGain * _error[i]
-                                     + _integralGain * _errorIntegral[i];                           // Apply PI control
-            }
+            {     
+                double error = _referencePosition[i] - _jointState->qpos[i];                         // Position error
+
+                _errorIntegral[i] += error / (double)_simFrequency;                                 // Cumulative error
+
+                double errorDerivative = (error - _error[i]) * _simFrequency;                       // Change in error over time
+
+                _jointState->ctrl[i] = _proportionalGain * error
+                                     + _integralGain * _errorIntegral[i]
+                                     + _derivativeGain * errorDerivative;                           // Apply PID control
+
+                _error[i] = error;                                                                  // Update error for next iteration           
+            }  
             
             break;
         }
         case TORQUE:
         {
-            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = _controlReference[i];
-            
+            // No need to do anything as control has been set in command callback function.
             break;
         }
         default:
         {
-            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;
+            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;                               // Don't move?
+            
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, 
+                                 "Unknown control mode.");
+            
+            break;
         }
     }
-
+    
     mj_step(_model, _jointState);                                                                   // Take a step in the simulation
 
     // Add joint state data to ROS2 message, then publish
@@ -252,9 +246,48 @@ MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::
 {
     if (msg->data.size() != _model->nq)                                                             // Expecting one more element for mode
     {
-        RCLCPP_WARN(this->get_logger(), "Received joint command with incorrect size.");
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                             "Received joint command with incorrect size.");
         return;
     }
-    
-    for(int i = 0; i < _model->nq; i++) _controlReference[i] = msg->data[i];                        // Save reference 
+    else
+    {
+        switch(_controlMode)
+        {
+            case POSITION:
+            {
+                for(int i = 0; i < _model->nq; i++)
+                {
+                    _referencePosition[i] = msg->data[i];                                           // Assign new reference position
+                }    
+                
+                break;
+            }
+            case VELOCITY:
+            {
+                for(int i = 0; i < _model->nq; i++)
+                {
+                    _referencePosition[i] += msg->data[i] / (double)_simFrequency;                  // Integrate to position level
+                } 
+                
+                break;
+            }
+            case TORQUE:
+            {
+                for(int i = 0; i < _model->nq; i++)
+                {
+                    _jointState->ctrl[i] = msg->data[i];                                                 // Assign torque input directly
+                }
+                
+                break;
+            }
+            default:
+            {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                                     "Unknown control mode. Unable to set joint commands.");
+                
+                break;
+            }
+        }
+    }
 }
