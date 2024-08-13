@@ -6,9 +6,16 @@
    <version>0.0.0</version>
    <description>Provides ROS2 communication with MuJoCo simulation.</description>
    <maintainer email="jonathan.woolfrey@gmail.com">Woolfrey</maintainer>
-   <license>GNU General Public Licence GPLv3</license>
+   <license>GNU General Public License GPLv3</license>
    
    <buildtool_depend>ament_cmake</buildtool_depend>
+   
+   <!-- Necessary dependencies for ROS2 launch files -->
+   <depend>launch</depend>
+   <depend>launch_ros</depend>
+   
+   <depend>sensor_msgs</depend>
+   <depend>std_msgs</depend>
 
    <test_depend>ament_lint_auto</test_depend>
    <test_depend>ament_lint_common</test_depend>
@@ -17,7 +24,5 @@
      <build_type>ament_cmake</build_type>
    </export>
    
-   <depend>sensor_msgs</depend>
-   <depend>std_msgs</depend>
-   
 </package>
+
