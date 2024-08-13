@@ -31,7 +31,9 @@ class MuJoCoInterface : public rclcpp::Node
         MuJoCoInterface(const std::string &xmlLocation,
                         const std::string &jointStateTopicName,
                         const std::string &jointControlTopicName,
-                        ControlMode controlMode = TORQUE);
+                        ControlMode controlMode = TORQUE,
+                        int simulationFrequency = 500,
+                        int visualizationFrequency = 20);
         
        /**
         * Deconstructor.
@@ -89,14 +91,13 @@ class MuJoCoInterface : public rclcpp::Node
 
         sensor_msgs::msg::JointState _jointStateMessage;                                            ///< For publishing joint state data over ROS2
         
-        unsigned int _simFrequency = 500;
-        unsigned int _vizFrequency = 20;
+        int _simFrequency = 500;
         
         double _proportionalGain = 1.0;
         double _derivativeGain   = 0.0;
         double _integralGain     = 0.0;
         
-        std::vector<double> _controlReference;
+        std::vector<double> _referencePosition;
         std::vector<double> _error;
         std::vector<double> _errorDerivative;
         std::vector<double> _errorIntegral;
