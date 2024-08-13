@@ -14,7 +14,7 @@ find_package(sensor_msgs REQUIRED)                                              
 find_package(std_msgs REQUIRED)                                                                     # std_msgs::msg::Float64MultiArray
 
 # MuJoCo
-set(MUJOCO_PATH "/opt/mujoco/mujoco-3.2.0")                                                         # Update this path to your MuJoCo installation
+set(MUJOCO_PATH "/opt/mujoco/mujoco-3.2.0") # UPDATE THIS TO YOUR MUJOCO PATH
 include_directories(include)                                                                        # Local header files
 include_directories(${MUJOCO_PATH}/include/mujoco)                                                  # MuJoCo header files
 include_directories(${MUJOCO_PATH}/include)                                                         # Additional MuJoCo header files
