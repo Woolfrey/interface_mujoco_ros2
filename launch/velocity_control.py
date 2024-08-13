@@ -15,7 +15,7 @@ def generate_launch_description():
         DeclareLaunchArgument('xml_location', default_value= xml_path),
         DeclareLaunchArgument('publisher_name', default_value='joint_states'),
         DeclareLaunchArgument('subscriber_name', default_value='joint_commands'),
-        DeclareLaunchArgument('simulation_frequency', default_value='1000'),
+        DeclareLaunchArgument('simulation_frequency', default_value='500'),
         DeclareLaunchArgument('visualization_frequency', default_value='20'),
         
         # Control gains
