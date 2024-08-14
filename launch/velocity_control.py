@@ -19,9 +19,9 @@ def generate_launch_description():
         DeclareLaunchArgument('visualization_frequency', default_value='20'),
         
         # Control gains
-        DeclareLaunchArgument('proportional_gain', default_value='10.0'),
-        DeclareLaunchArgument('integral_gain', default_value='5.0'),
-        DeclareLaunchArgument('derivative_gain', default_value='0.05'),
+        DeclareLaunchArgument('proportional_gain', default_value='50.0'),
+        DeclareLaunchArgument('integral_gain', default_value='100.0'),
+        DeclareLaunchArgument('derivative_gain', default_value='0.0001'),
         
         # Camera settings
         DeclareLaunchArgument('camera_focal_point', default_value='[0.0, 0.0, 0.5]'),
