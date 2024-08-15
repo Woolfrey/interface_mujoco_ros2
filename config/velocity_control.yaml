@@ -1,0 +1,6 @@
+mujoco_sim_parameters:
+  ros__parameters:
+    control_mode: VELOCITY
+    proportional_gain: 10.0
+    integral_gain: 1.0
+    derivative_gain: 0.01
