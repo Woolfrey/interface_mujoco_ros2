@@ -1,0 +1,7 @@
+mujoco_sim_parameters:
+  ros__parameters:
+    camera_focal_point: [0.0, 0.0, 0.5]
+    camera_distance: 2.5
+    camera_azimuth: 45.0
+    camera_elevation: -30.0
+    camera_orthographic: true
