@@ -194,10 +194,9 @@ MuJoCoInterface::update_simulation()
         }
         default:
         {
-            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;                               // Don't move?
+            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;                         // Don't move?
             
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, 
-                                 "Unknown control mode.");
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Unknown control mode.");
             
             break;
         }
@@ -221,10 +220,9 @@ MuJoCoInterface::update_simulation()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void MuJoCoInterface::update_visualization()
 {
-    glfwMakeContextCurrent(_window); // Ensure OpenGL context is current
+    glfwMakeContextCurrent(_window);                                                                // Ensure OpenGL context is current
     
-    // Update 3D rendering
-    mjv_updateScene(_model, _jointState, &_renderingOptions, NULL, &_camera, mjCAT_ALL, &_scene);
+    mjv_updateScene(_model, _jointState, &_renderingOptions, NULL, &_camera, mjCAT_ALL, &_scene);   // Update 3D rendering
 
     // Get framebuffer size
     int width, height;
@@ -256,28 +254,19 @@ MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::
         {
             case POSITION:
             {
-                for(int i = 0; i < _model->nq; i++)
-                {
-                    _referencePosition[i] = msg->data[i];                                           // Assign new reference position
-                }    
+                for(int i = 0; i < _model->nq; i++) _referencePosition[i] = msg->data[i];           // Assign new reference position
                 
                 break;
             }
             case VELOCITY:
             {
-                for(int i = 0; i < _model->nq; i++)
-                {
-                    _referencePosition[i] += msg->data[i] / (double)_simFrequency;                  // Integrate to position level
-                } 
-                
+                for(int i = 0; i < _model->nq; i++) _referencePosition[i] += msg->data[i] / (double)_simFrequency; // Integrate to position level
+   
                 break;
             }
             case TORQUE:
             {
-                for(int i = 0; i < _model->nq; i++)
-                {
-                    _jointState->ctrl[i] = msg->data[i];                                                 // Assign torque input directly
-                }
+                for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = msg->data[i];            // Assign torque input directly
                 
                 break;
             }
@@ -285,7 +274,6 @@ MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::
             {
                 RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                                      "Unknown control mode. Unable to set joint commands.");
-                
                 break;
             }
         }
