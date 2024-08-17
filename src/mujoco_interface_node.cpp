@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 
     int simulationFrequency    = node->declare_parameter<int>("simulation_frequency", 1);
     int visualizationFrequency = node->declare_parameter<int>("visualization_frequency", 20);
-    std::string xmlLocation    = node->declare_parameter<std::string>("xml_location", "");
+    std::string xmlLocation    = node->declare_parameter<std::string>("xml_path", "");
     std::string controlMode    = node->declare_parameter<std::string>("control_mode", "TORQUE");
     std::string publisherName  = node->declare_parameter<std::string>("publisher_name", "joint_states");
     std::string subscriberName = node->declare_parameter<std::string>("subscriber_name", "joint_commands");
@@ -43,23 +43,31 @@ int main(int argc, char *argv[])
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     
-    auto mujocoSim = std::make_shared<MuJoCoInterface>(xmlLocation,
-                                                       publisherName,
-                                                       subscriberName,
-                                                       control_mode,
-                                                       simulationFrequency,
-                                                       visualizationFrequency);
+    try
+    {
+        auto mujocoSim = std::make_shared<MuJoCoInterface>(xmlLocation,
+                                                           publisherName,
+                                                           subscriberName,
+                                                           control_mode,
+                                                           simulationFrequency,
+                                                           visualizationFrequency);
 
-    mujocoSim->set_feedback_gains(proportionalGain, integralGain, derivativeGain);
+        mujocoSim->set_feedback_gains(proportionalGain, integralGain, derivativeGain);
 
-    mujocoSim->set_camera_properties({camera_focal_point[0], camera_focal_point[1], camera_focal_point[2]},
-                                      camera_distance,
-                                      camera_azimuth, 
-                                      camera_elevation,
-                                      camera_orthographic);
+        mujocoSim->set_camera_properties({camera_focal_point[0], camera_focal_point[1], camera_focal_point[2]},
+                                          camera_distance,
+                                          camera_azimuth, 
+                                          camera_elevation,
+                                          camera_orthographic);
+                                      
 
-    rclcpp::spin(mujocoSim);                                                                        // Run the simulation indefinitely
-
+        rclcpp::spin(mujocoSim);                                                                    // Run the simulation indefinitely
+    }
+    catch(const std::exception &exception)
+    {
+        std::cerr << exception.what() << "\n";
+    }
+    
     rclcpp::shutdown();                                                                             // Shut down
     
     return 0;
