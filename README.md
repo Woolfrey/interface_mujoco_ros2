@@ -3,6 +3,14 @@
 
 This class establishes communication between a MuJoCo simulation and ROS2.
 
+It publishes a `sensor_msgs::msg::JointState` topic for you to use, and allows commands to the joints via a `std_msgs::msg::Float64MultiArray` topic:
+
+<p align = "center">
+<img src ="https://github.com/user-attachments/assets/fff5be63-dc23-4c33-97a6-83f376ffccc6" width = "800" height = "auto" />
+</p>
+
+It can run in `POSITION`, `VELOCITY`, or `TORQUE` mode which may be set via the config and/or launch file(s).
+
 >[!TIP]
 > You can download MuJoCo robot models [here](https://github.com/google-deepmind/mujoco_menagerie.git).
 
@@ -86,9 +94,6 @@ save, build, and run:
 ```
 ros2 launch mujoco_interface default.py
 ```
-<p align="center">
-<img src="https://github.com/user-attachments/assets/7049210a-2ab5-4a91-afb8-e369c787c82e" width="800" height="auto"/>
-</p>
 
 There are configuration files in the `config/` directory you can alter.
 
