@@ -32,7 +32,7 @@ class MuJoCoInterface : public rclcpp::Node
                         const std::string &jointStateTopicName,
                         const std::string &jointControlTopicName,
                         ControlMode controlMode = TORQUE,
-                        int simulationFrequency = 500,
+                        int simulationFrequency = 1000,
                         int visualizationFrequency = 20);
         
        /**
@@ -91,22 +91,22 @@ class MuJoCoInterface : public rclcpp::Node
 
         sensor_msgs::msg::JointState _jointStateMessage;                                            ///< For publishing joint state data over ROS2
         
-        int _simFrequency = 500;
+        int _simFrequency = 1000;                                                                   ///< Speed at which the frequency runs
         
-        double _proportionalGain = 1.0;
-        double _derivativeGain   = 0.0;
-        double _integralGain     = 0.0;
+        double _proportionalGain = 1.0;                                                             ///< Feedback on tracking error in position, velocity control mode
+        double _derivativeGain   = 0.0;                                                             ///< Feedback on change in tracking error in position, velocity control mode
+        double _integralGain     = 0.0;                                                             ///< Feedback on accumulated error in position, velocity control mode
         
-        std::vector<double> _referencePosition;
-        std::vector<double> _error;
-        std::vector<double> _errorDerivative;
-        std::vector<double> _errorIntegral;
+        std::vector<double> _referencePosition;                                                     ///< For position, velocity control mode
+        std::vector<double> _error;                                                                 ///< Difference between reference and actual joint position
+        std::vector<double> _errorDerivative;                                                       ///< Change in error
+        std::vector<double> _errorIntegral;                                                         ///< Cumulative error
         
-        bool _cameraOrthographic = false;
-        double _cameraAzimuth    = 45.0;
-        double _cameraDistance   = 2.5;
-        double _cameraElevation  = -30;           
-        std::vector<double> _cameraFocalPoint = {0.0, 0.0, 1.0};
+        bool _cameraOrthographic = false;                                                           ///< Sets the type of projection
+        double _cameraAzimuth    = 45.0;                                                            ///< Rotation around camera focal point
+        double _cameraDistance   = 2.5;                                                             ///< Distance from camera focal point
+        double _cameraElevation  = -30;                                                             ///< Dictates height of camera
+        std::vector<double> _cameraFocalPoint = {0.0, 0.0, 1.0};                                    ///< Where the camera is directed at
       
         /**
          * Updates the robot state, publishes joint state information.
