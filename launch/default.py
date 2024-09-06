@@ -7,10 +7,10 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
 
     # Load config files
-    config_dir = os.path.join(get_package_share_directory('mujoco_interface'), 'config')  # Get the path to the config directory
-    control_params = os.path.join(config_dir, 'velocity_control.yaml')                    # Change this for different control modes, gains
+    config_dir = os.path.join(get_package_share_directory('mujoco_interface'), 'config')
+    control_params = os.path.join(config_dir, 'velocity_control.yaml')
     camera_params = os.path.join(config_dir, 'default_camera.yaml')
-    sim_params = os.path.join(config_dir, 'default_sim.yaml')                             # Fix the typo in variable name
+    sim_params = os.path.join(config_dir, 'default_sim.yaml') 
 
     return LaunchDescription([
         # Node configuration
@@ -26,4 +26,3 @@ def generate_launch_description():
             ]
         )
     ])
-
