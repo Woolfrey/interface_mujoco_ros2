@@ -3,10 +3,13 @@
 
 This class establishes communication between a MuJoCo simulation and ROS2.
 
-> [!WARNING]
-> This repository is still under construction. <br>
-> It is currently only publishing joint states. Work to receive joint commands is underway. <br>
-> Stay tuned!
+It publishes a `sensor_msgs::msg::JointState` topic for you to use, and allows commands to the joints via a `std_msgs::msg::Float64MultiArray` topic:
+
+<p align = "center">
+<img src ="https://github.com/user-attachments/assets/fff5be63-dc23-4c33-97a6-83f376ffccc6" width = "800" height = "auto" />
+</p>
+
+It can run in `POSITION`, `VELOCITY`, or `TORQUE` mode which may be set via the config and/or launch file(s).
 
 >[!TIP]
 > You can download MuJoCo robot models [here](https://github.com/google-deepmind/mujoco_menagerie.git).
@@ -81,13 +84,19 @@ source install/setup.bash
 
 #### Launching the Interface
 
-To launch the MuJoCo ROS2 Interface, run the following command:
+To launch the MuJoCo ROS2 Interface:
 
+First modify this line in the file `launch/default.py`:
 ```
-ros2 run mujoco_interface mujoco_interface_node /path/to/your/robot_model.xml
+{'xml_path': '/home/woolfrey/workspace/colcon/src/interface_mujoco_ros2/test/scene.xml'} # CHANGE THIS
+```
+save, build, and run:
+```
+ros2 launch mujoco_interface default.py
 ```
 
-Replace /path/to/your/robot_model.xml with the path to your MuJoCo XML model or scene file.
+There are configuration files in the `config/` directory you can alter.
+
 
 [⬆️ Back to top.](#top)
 
