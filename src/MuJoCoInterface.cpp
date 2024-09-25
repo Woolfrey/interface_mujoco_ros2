@@ -172,7 +172,7 @@ MuJoCoInterface::update_simulation()
         {
             for(int i = 0; i < _model->nq; i++)
             {     
-                double error = _referencePosition[i] - _jointState->qpos[i];                         // Position error
+                double error = _referencePosition[i] - _jointState->qpos[i];                        // Position error
 
                 _errorIntegral[i] += error / (double)_simFrequency;                                 // Cumulative error
 
