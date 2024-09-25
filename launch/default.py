@@ -10,7 +10,10 @@ def generate_launch_description():
     config_dir = os.path.join(get_package_share_directory('mujoco_interface'), 'config')
     control_params = os.path.join(config_dir, 'velocity_control.yaml')
     camera_params = os.path.join(config_dir, 'default_camera.yaml')
-    sim_params = os.path.join(config_dir, 'default_sim.yaml') 
+    sim_params = os.path.join(config_dir, 'default_sim.yaml')
+
+    # Define the LaunchConfiguration for xml_path with a default value
+    xml_path = LaunchConfiguration('xml_path', default='/home/woolfrey/workspace/colcon/src/interface_mujoco_ros2/test/scene.xml')
 
     return LaunchDescription([
         # Node configuration
@@ -22,7 +25,8 @@ def generate_launch_description():
                 control_params,
                 camera_params,
                 sim_params,
-                {'xml_path': '/home/woolfrey/workspace/colcon/src/interface_mujoco_ros2/test/scene.xml'} # CHANGE THIS
+                {'xml_path': xml_path}
             ]
         )
     ])
+
