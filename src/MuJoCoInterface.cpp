@@ -20,6 +20,29 @@ MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
                                    _controlMode(controlMode),
                                    _simFrequency(simulationFrequency)
 {
+
+    std::string ctrlMode;
+    switch(controlMode)
+    {
+        case POSITION:
+        {
+            ctrlMode = "POSITION";
+            break;
+        }
+        case VELOCITY:
+        {
+            ctrlMode = "VELOCITY";
+            break;
+        }
+        case TORQUE:
+        {
+            ctrlMode = "TORQUE";
+            break;
+        }
+    }
+    
+    RCLCPP_INFO(this->get_logger(),"Control mode set to %s.", ctrlMode.c_str());
+
     // Load the robot model
     char error[1000] = "Could not load binary model";
     _model = mj_loadXML(xmlLocation.c_str(), nullptr, error, 1000);
@@ -88,7 +111,6 @@ MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
     mjr_makeContext(_model, &_context, mjFONTSCALE_100);
     
     // Create timers
-    
     _simTimer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(1000/simulationFrequency)),
                                         std::bind(&MuJoCoInterface::update_simulation, this));
 
@@ -204,14 +226,18 @@ MuJoCoInterface::update_simulation()
     
     mj_step(_model, _jointState);                                                                   // Take a step in the simulation
 
-    // Add joint state data to ROS2 message, then publish
+    // Add joint state data to ROS2 message
     for(int i = 0; i < _model->nq; i++)
     {
         _jointStateMessage.position[i] = _jointState->qpos[i];
         _jointStateMessage.velocity[i] = _jointState->qvel[i];
         _jointStateMessage.effort[i]   = _jointState->actuator_force[i];
     }
-    
+
+    // Set the timestamp for the message
+    _jointStateMessage.header.stamp = this->get_clock()->now();                                     // Add current time stamp
+//  _jointStateMessage.header.frame_id = "";                                                        // Optional: set frame_id if needed
+     
     _jointStatePublisher->publish(_jointStateMessage);                                              // As it says
 }
 
