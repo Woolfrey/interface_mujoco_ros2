@@ -32,26 +32,13 @@ class MuJoCoInterface : public rclcpp::Node
                         const std::string &jointStateTopicName,
                         const std::string &jointControlTopicName,
                         ControlMode controlMode = TORQUE,
-                        int simulationFrequency = 1000,
+                        int simulationFrequency = 500,
                         int visualizationFrequency = 20);
         
        /**
         * Deconstructor.
         */
         ~MuJoCoInterface();
-        
-        /**
-         * Set the gains for feedback control.
-         * @param proportional The gain in position error.
-         * @param integral The gain on the accumulated position error.
-         * @param derivative The gain in the change in position error.
-         * @return False if there is a problem with the input arguments.
-         */
-        bool
-        set_feedback_gains(const double &proportional,
-                           const double &integral,
-                           const double &derivative);
-                           
         
         /**
          * Sets the viewing properties in the window.
@@ -68,8 +55,10 @@ class MuJoCoInterface : public rclcpp::Node
                               const double &elevation = -45.0,
                               const bool   &orthographic = false);
     private:
-     
-        ControlMode _controlMode;
+
+        std::vector<double> _torqueInput;                                                           ///< Used to store joint commands in torque mode
+        
+        ControlMode _controlMode;                                                                   ///< POSITION, VELOCITY, or TORQUE
         
         mjModel *_model;                                                                            ///< Underlying model of the robot.
         mjData  *_jointState;                                                                       ///< Joint state data (position, velocity, acceleration)
@@ -91,17 +80,8 @@ class MuJoCoInterface : public rclcpp::Node
 
         sensor_msgs::msg::JointState _jointStateMessage;                                            ///< For publishing joint state data over ROS2
         
-        int _simFrequency = 1000;                                                                   ///< Speed at which the frequency runs
-        
-        double _proportionalGain = 1.0;                                                             ///< Feedback on tracking error in position, velocity control mode
-        double _derivativeGain   = 0.0;                                                             ///< Feedback on change in tracking error in position, velocity control mode
-        double _integralGain     = 0.0;                                                             ///< Feedback on accumulated error in position, velocity control mode
-        
-        std::vector<double> _referencePosition;                                                     ///< For position, velocity control mode
-        std::vector<double> _error;                                                                 ///< Difference between reference and actual joint position
-        std::vector<double> _errorDerivative;                                                       ///< Change in error
-        std::vector<double> _errorIntegral;                                                         ///< Cumulative error
-        
+        int _simFrequency = 500;                                                                    ///< Speed at which the frequency runs
+    
         bool _cameraOrthographic = false;                                                           ///< Sets the type of projection
         double _cameraAzimuth    = 45.0;                                                            ///< Rotation around camera focal point
         double _cameraDistance   = 2.5;                                                             ///< Distance from camera focal point
