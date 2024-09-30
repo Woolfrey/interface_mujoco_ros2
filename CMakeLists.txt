@@ -31,11 +31,14 @@ install(TARGETS mujoco_interface_node
         DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch
-DESTINATION share/${PROJECT_NAME}/launch)
+        DESTINATION share/${PROJECT_NAME}/launch)
 
-install(
-  DIRECTORY config/
-  DESTINATION share/${PROJECT_NAME}/config
+install(DIRECTORY config/
+        DESTINATION share/${PROJECT_NAME}/config
+)
+
+install(DIRECTORY test/
+        DESTINATION share/${PROJECT_NAME}/test
 )
 
 ament_package()
