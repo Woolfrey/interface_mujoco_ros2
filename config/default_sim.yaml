@@ -2,5 +2,5 @@ mujoco_sim_parameters:
   ros__parameters:
     publisher_name: 'joint_states'
     subscriber_name: 'joint_commands'
-    simulation_frequency: 500
+    simulation_frequency: 1000
     visualization_frequency: 20
