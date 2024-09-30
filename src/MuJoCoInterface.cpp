@@ -20,54 +20,39 @@ MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
                                    _controlMode(controlMode),
                                    _simFrequency(simulationFrequency)
 {
-
-    std::string ctrlMode;
-    switch(controlMode)
-    {
-        case POSITION:
-        {
-            ctrlMode = "POSITION";
-            break;
-        }
-        case VELOCITY:
-        {
-            ctrlMode = "VELOCITY";
-            break;
-        }
-        case TORQUE:
-        {
-            ctrlMode = "TORQUE";
-            break;
-        }
-    }
-    
-    RCLCPP_INFO(this->get_logger(),"Control mode set to %s.", ctrlMode.c_str());
-
     // Load the robot model
+    
     char error[1000] = "Could not load binary model";
+    
     _model = mj_loadXML(xmlLocation.c_str(), nullptr, error, 1000);
 
-    if (!_model)
+    if (not _model)
     {
         RCLCPP_ERROR(this->get_logger(), "Error loading model: %s", error);
-        rclcpp::shutdown();
+        
+        rclcpp::shutdown();                                                                         // Shut down action server
     }
 
-    _jointState = mj_makeData(_model);  // Initialize joint state
+    _model->opt.timestep = 1/(double)_simFrequency;                                                 // Match MuJoCo to node frequency
+   
+    std::string ctrlMode;
+    
+         if(controlMode == POSITION) ctrlMode = "POSITION";
+    else if(controlMode == VELOCITY) ctrlMode = "VELOCITY";
+    else if(controlMode == TORQUE)   ctrlMode = "TORQUE";
+    
+    RCLCPP_INFO(this->get_logger(), "Control mode set to %s.", ctrlMode.c_str());
 
     // Resize arrays based on the number of joints in the model
+    _jointState = mj_makeData(_model);                                                              // Initialize joint state
     _jointStateMessage.name.resize(_model->nq);
     _jointStateMessage.position.resize(_model->nq);
     _jointStateMessage.velocity.resize(_model->nq);
-    _jointStateMessage.effort.resize(_model->nq);
-    _error.resize(_model->nq);
-    _errorDerivative.resize(_model->nq);
-    _errorIntegral.resize(_model->nq);
-    
-    _referencePosition.resize(_model->nq, 0.0);
+    _jointStateMessage.effort.resize(_model->nq);    
+    _torqueInput.resize(_model->nq, 0.0);
 
     // Record joint names
-    for (int i = 0; i < _model->nq; i++)
+    for (int i = 0; i < _model->nq; ++i)
     {
         _jointStateMessage.name[i] = mj_id2name(_model, mjOBJ_JOINT, i);
     }
@@ -119,41 +104,93 @@ MuJoCoInterface::MuJoCoInterface(const std::string &xmlLocation,
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                                           Destructor                                           //
+ //                                    Update the simulation                                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-MuJoCoInterface::~MuJoCoInterface()
+void MuJoCoInterface::update_simulation()
 {
-    mj_deleteData(_jointState);
-    mj_deleteModel(_model);
-    mjv_freeScene(&_scene);
-    mjr_freeContext(&_context);
-    glfwDestroyWindow(_window);
-    glfwTerminate();
+    if (not _model and not _jointState)
+    {
+        RCLCPP_ERROR(this->get_logger(), "MuJoCo model or data is not initialized.");
+        return;
+    }
+
+    if (_controlMode == TORQUE)
+    {
+        for (int i = 0; i < _model->nq; ++i)
+        {
+            _jointState->ctrl[i] = _torqueInput[i]                                                  // Transfer torque input
+                                 + _jointState->qfrc_bias[i]                                        // Compensate for gravity
+                                 - 0.01*_jointState->qvel[i];                                       // Add some damping
+                                 
+            _torqueInput[i] = 0.0;                                                                  // Clear value
+        }
+    }
+
+    mj_step(_model, _jointState);                                                                   // Take a step in the simulation
+
+    // Add joint state data to ROS2 message
+    for (int i = 0; i < _model->nq; ++i)
+    {
+        _jointStateMessage.position[i] = _jointState->qpos[i];
+        _jointStateMessage.velocity[i] = _jointState->qvel[i];
+        _jointStateMessage.effort[i]   = _jointState->actuator_force[i];
+    }
+
+    _jointStateMessage.header.stamp = this->get_clock()->now();                                     // Add current time stamp (for rqt)
+    
+    _jointStatePublisher->publish(_jointStateMessage);                                              // Publish the joint state message
+
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                               Set the gains for feedback control                               //
+ //                                    Handle joint commands                                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool
-MuJoCoInterface::set_feedback_gains(const double &proportional,
-                                    const double &integral,
-                                    const double &derivative)
+void
+MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
 {
-    if(proportional < 0 or integral < 0 or derivative < 0)
+    if (msg->data.size() != _model->nq)
     {
-        RCLCPP_WARN(this->get_logger(), "Gains cannot be negative.");
-        
-        return false;
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                             "Received joint command with incorrect size.");
+        return;
     }
     else
     {
-        _proportionalGain = proportional;
-        _derivativeGain   = derivative;
-        _integralGain     = integral;
-        
-        return true;
+        switch(_controlMode)
+        {
+            case POSITION:
+            {
+                for(int i = 0; i < _model->nq; ++i)
+                {
+                    _jointState->ctrl[i] = msg->data[i];                                            // Assign control input directly
+                }
+                break;
+            }
+            case VELOCITY:
+            {
+                for(int i = 0; i < _model->nq; ++i)
+                {
+                    _jointState->ctrl[i] += msg->data[i] / (double)_simFrequency;                   // Integrate velocity to position level
+                }
+                break;
+            }
+            case TORQUE:
+            {
+                for(int i = 0; i < _model->nq; ++i)
+                {
+                    _torqueInput[i] = msg->data[i];
+                }
+                break;
+            }
+            default:
+            {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                                     "Unknown control mode. Unable to set joint commands.");
+                break;
+            }
+        }
     }
-}          
+}
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                          Sets camera viewing position & angle                                  //
@@ -174,72 +211,6 @@ MuJoCoInterface::set_camera_properties(const std::array<double, 3> &focalPoint,
     _camera.orthographic = orthographic;
 }
 
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                                    Update the simulation                                       //
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-MuJoCoInterface::update_simulation()
-{
-    if((not _model) and (not _jointState))
-    {
-        RCLCPP_ERROR(this->get_logger(), "MuJoCo model or data is not initialized.");
-        return;
-    }
-    
-    // Compute control input based on mode
-    switch(_controlMode)
-    {
-        case POSITION:
-        case VELOCITY:
-        {
-            for(int i = 0; i < _model->nq; i++)
-            {     
-                double error = _referencePosition[i] - _jointState->qpos[i];                        // Position error
-
-                _errorIntegral[i] += error / (double)_simFrequency;                                 // Cumulative error
-
-                double errorDerivative = (error - _error[i]) * _simFrequency;                       // Change in error over time
-
-                _jointState->ctrl[i] = _proportionalGain * error
-                                     + _integralGain * _errorIntegral[i]
-                                     + _derivativeGain * errorDerivative;                           // Apply PID control
-
-                _error[i] = error;                                                                  // Update error for next iteration           
-            }  
-            
-            break;
-        }
-        case TORQUE:
-        {
-            // No need to do anything as control has been set in command callback function.
-            break;
-        }
-        default:
-        {
-            for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = 0.0;                         // Don't move?
-            
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Unknown control mode.");
-            
-            break;
-        }
-    }
-    
-    mj_step(_model, _jointState);                                                                   // Take a step in the simulation
-
-    // Add joint state data to ROS2 message
-    for(int i = 0; i < _model->nq; i++)
-    {
-        _jointStateMessage.position[i] = _jointState->qpos[i];
-        _jointStateMessage.velocity[i] = _jointState->qvel[i];
-        _jointStateMessage.effort[i]   = _jointState->actuator_force[i];
-    }
-
-    // Set the timestamp for the message
-    _jointStateMessage.header.stamp = this->get_clock()->now();                                     // Add current time stamp
-//  _jointStateMessage.header.frame_id = "";                                                        // Optional: set frame_id if needed
-     
-    _jointStatePublisher->publish(_jointStateMessage);                                              // As it says
-}
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
  //                                    Update the 3D simulation                                    //
@@ -263,45 +234,14 @@ void MuJoCoInterface::update_visualization()
 }
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////
- //                                    Handle joint commands                                       //
+ //                                           Destructor                                           //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-MuJoCoInterface::joint_command_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+MuJoCoInterface::~MuJoCoInterface()
 {
-    if (msg->data.size() != _model->nq)                                                             // Expecting one more element for mode
-    {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                             "Received joint command with incorrect size.");
-        return;
-    }
-    else
-    {
-        switch(_controlMode)
-        {
-            case POSITION:
-            {
-                for(int i = 0; i < _model->nq; i++) _referencePosition[i] = msg->data[i];           // Assign new reference position
-                
-                break;
-            }
-            case VELOCITY:
-            {
-                for(int i = 0; i < _model->nq; i++) _referencePosition[i] += msg->data[i] / (double)_simFrequency; // Integrate to position level
-   
-                break;
-            }
-            case TORQUE:
-            {
-                for(int i = 0; i < _model->nq; i++) _jointState->ctrl[i] = msg->data[i];            // Assign torque input directly
-                
-                break;
-            }
-            default:
-            {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                                     "Unknown control mode. Unable to set joint commands.");
-                break;
-            }
-        }
-    }
-}
+    mj_deleteData(_jointState);
+    mj_deleteModel(_model);
+    mjv_freeScene(&_scene);
+    mjr_freeContext(&_context);
+    glfwDestroyWindow(_window);
+    glfwTerminate();
+}     
