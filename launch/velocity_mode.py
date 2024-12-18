@@ -15,19 +15,21 @@ def generate_launch_description():
     sim_params = os.path.join(config_dir, 'default_sim.yaml')
 
     # Define the LaunchConfiguration for xml_path using the path inside mujoco_interface
-    xml_path = LaunchConfiguration('xml_path', default=os.path.join(mujoco_interface_dir, 'test/position_mode/scene.xml'))
+    xml = LaunchConfiguration('xml', default=os.path.join(mujoco_interface_dir, 'test/position_mode/scene.xml'))
 
     return LaunchDescription([
         # Node configuration
-        Node(
-            package='mujoco_interface',
-            executable='mujoco_interface_node',
-            output='screen',
-            parameters=[
-                {'control_mode': 'VELOCITY'},
+        Node
+        (
+            package    = 'mujoco_interface',
+            executable = 'mujoco_interface_node',
+            output     = 'screen',
+            parameters =
+            [
+                {'mode': 'VELOCITY'},
                 camera_params,
                 sim_params,
-                {'xml_path': xml_path}
+                {'xml': xml}
             ]
         )
     ])
