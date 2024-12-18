@@ -30,15 +30,9 @@ ament_target_dependencies(mujoco_interface_node rclcpp sensor_msgs std_msgs)
 install(TARGETS mujoco_interface_node
         DESTINATION lib/${PROJECT_NAME})
 
-install(DIRECTORY launch
-        DESTINATION share/${PROJECT_NAME}/launch)
-
-install(DIRECTORY config/
-        DESTINATION share/${PROJECT_NAME}/config
+install(DIRECTORY config
+                  launch
+                  test
+        DESTINATION share/${PROJECT_NAME}
 )
-
-install(DIRECTORY test/
-        DESTINATION share/${PROJECT_NAME}/test
-)
-
 ament_package()
