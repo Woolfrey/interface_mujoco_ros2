@@ -1,8 +1,0 @@
-mujoco_sim_parameters: # NOTE: This must match the node name in the cpp file
-  ros__parameters:
-    control_mode: TORQUE
-    
-# NOTE: Gains don't matter for torque mode!
-#    proportional_gain: 50.0
-#    integral_gain: 10.0
-#    derivative_gain: 0.01
