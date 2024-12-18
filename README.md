@@ -1,6 +1,10 @@
 <a name="top"></a>
 # MuJoCo-ROS2 Interface
 
+> [!NOTE]
+> This project is a work-in-progress, so new features will be added slowly.
+> Feel free to contribute your own improvements.
+
 This class establishes communication between a MuJoCo simulation and ROS2.
 
 It publishes a `sensor_msgs::msg::JointState` topic for you to use, and allows commands to the joints via a `std_msgs::msg::Float64MultiArray` topic:
@@ -84,19 +88,22 @@ source install/setup.bash
 
 #### Launching the Interface
 
-To launch the MuJoCo ROS2 Interface:
+There are 2 different control modes currently available:
 
-First modify this line in the file `launch/default.py`:
+To run **velocity control**, you can launch:
 ```
-{'xml_path': '/home/woolfrey/workspace/colcon/src/interface_mujoco_ros2/test/scene.xml'} # CHANGE THIS
+ros2 launch mujoco_interface velocity_mode.py
 ```
-save, build, and run:
-```
-ros2 launch mujoco_interface default.py
-```
+This requires that the topic `/joint_commands` contains an array of velocites (in rad/s).
 
-There are configuration files in the `config/` directory you can alter.
+To run **torque control**, you can launch:
+```
+ros2 launch mujoco_interface torque_mode.py
+```
+This requires that the topic `/joint_commands` contains an array of torques (Nm).
 
+> [!TIP]
+> In torque mode, gravity and Coriolis torques are automatically compensated for.
 
 [⬆️ Back to top.](#top)
 
