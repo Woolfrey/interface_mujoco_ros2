@@ -18,8 +18,8 @@ int main(int argc, char *argv[])
 
     int simulationFrequency    = node->declare_parameter<int>("simulation_frequency", 500);
     int visualizationFrequency = node->declare_parameter<int>("visualization_frequency", 20);
-    std::string xmlLocation    = node->declare_parameter<std::string>("xml_path", "");
-    std::string controlMode    = node->declare_parameter<std::string>("control_mode", "TORQUE");
+    std::string xmlLocation    = node->declare_parameter<std::string>("xml", "");
+    std::string controlMode    = node->declare_parameter<std::string>("mode", "TORQUE");
     std::string publisherName  = node->declare_parameter<std::string>("publisher_name", "joint_states");
     std::string subscriberName = node->declare_parameter<std::string>("subscriber_name", "joint_commands");
 
